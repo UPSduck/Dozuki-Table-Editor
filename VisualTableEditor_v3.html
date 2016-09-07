@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>VisualTables for Dozuki</title>
+	<style>
+		body {
+			font-family: "Lato",Arial,sans-serif;
+			word-wrap: break-word;
+    		overflow-wrap: break-word;
+    		background-color: #DDD;
+
+		}
+		#page{
+			width:100%;
+			max-width: 800px;
+			background-color:#FFF;
+			margin:0 auto 0 auto;
+		}
+		#pageHeader{
+			background-color: #FFF;
+			color: #000;
+			padding:50px;
+		}
+		#pageHeader h3{
+			color: #2aa3d8;
+		}
+
+		#pageContent{
+			padding:0px 100px 20px 100px;
+		}
+		#pageFooter{
+			background-color: #BBB;
+			color: #FFF;
+			padding:20px 50px 20px 100px;
+		}
+		table {
+			width: auto;
+    		margin: 16px 0;
+    		border: 1px solid #ddd;
+    		border-collapse: separate;
+    		border-left: 0;
+    		border-radius: 4px;
+    		max-width: 100%;
+    		background-color: transparent;
+    		border-spacing: 0;
+    		box-sizing: border-box;
+    		display: table;
+    		color: #777;
+
+		}
+		table th  {
+    		color: #555;
+    		border-left: 1px solid #999;
+    		border-right: 2px solid #999;
+    		border-bottom: 2px solid #999;
+    		padding: 4px 5px;
+    		font-weight: bold;
+    		line-height: 18px;
+    		text-align: left;
+    		vertical-align: top;
+    		font-size: 14px;
+    		display: table-cell;
+		}
+		table td {
+			border-left: 1px solid #ddd;
+			padding: 4px 5px;
+			line-height: 18px;
+    		text-align: left;
+    		vertical-align: top;
+    		border-top: 1px solid #ddd;
+    		font-size: 14px;
+    		display: table-cell;
+		}
+	</style>
+</head>
+<body onload="updateCanvas()">
+<div id="page">
+	<div id="pageHeader">
+	<h1>Dozuki Table Editor </h1>
+	<h3> An easier method to creating tables for your dozuki site. </h3>
+	</div>
+	<div id="pageContent">
+	<div id="ImportFile">
+		<h2>Import CSV File</h2>
+		<input type="file" id="fileinput" accept=".csv"/><br><br>
+	</div>
+
+	<div id="dozukiCodeEditor">
+		<h2>Code Editor</h2>
+		<textarea id="tableCode" style="width:100%;height:100px" onkeyup="updateCanvas()">
+{table |width=100% |format=50%l:50%r
+|! <<colspan="2">> Sample Table
+|-- | Click any cell to Edit | col 2 
+|-- | col 1 | col 2 
+} 
+		</textarea>
+	</div>
+	<br>
+	<div id="tableDisplay">
+		<h2>Table Display</h2>
+		<div id="editMenuBar">
+			<button onclick="addRow()">Add Row</button><button onclick="addColumn()">Add Column</button><br>
+			<div id="cellToolBar" style="display:none;">
+				Text:<input type="color" id="textColorInput" value="#000000">  
+				BG:<input type="color" id="bgColorInput" value="#ffffff">
+				Span:<input id="colspanInput" type="number" min="1" max="5">
+				<br>
+				<button id="deleteCellButton">Delete Cell</button>
+			<!--	Rowspan:<input id="rowspanInput" type="number" min="1"  max="5"> -->
+			</div>
+		</div>
+		<div id="TableContainer">
+		</div>
+	</div>
+	</div>
+	<div id="pageFooter">
+		<p>Created by Forrest McBride</p>
+	</div>
+</div>
+
+<!-- IMPORT CSV SCRIPT -->
+<script type="text/javascript">
+/* ##############################
+   ######## GLOBAL VARS ######### 
+   ############################## */
+var contents = "";
+var csvFile = "", csvWidth="0";
+var csvFiltered = [];
+
+/* ##############################
+   ######### FUNCTIONS ########## 
+   ############################## */
+
+function selectText(containerid) {
+        if (document.selection) {
+            var range = document.body.createTextRange();
+            range.moveToElementText(document.getElementById(containerid));
+            range.select();
+        } else if (window.getSelection) {
+            var range = document.createRange();
+            range.selectNode(document.getElementById(containerid));
+            window.getSelection().addRange(range);
+        }
+}
+
+function readSingleFile(evt) {
+    //Retrieve the first (and only!) File from the FileList object
+    var f = evt.target.files[0]; 
+
+    if (f) {
+      var r = new FileReader();
+      r.onload = function(e) { 
+	      contents = e.target.result;
+              csvFile = contents.split(',');
+		for(i=0,len=csvFile.length;i<len;i++){
+		cell= csvFile[i];
+			if(cell.length==2 && cell.includes('\r')){
+			   csvFiltered.push("\n |-- ")
+			}
+			else{
+			   csvFiltered.push(" | "+cell)
+			}
+		}
+
+	    contents = '\n {table |-- ' + csvFiltered.join(" ") + '\n }';
+        document.getElementById('tableCode').innerHTML = contents;
+        updateCanvas();
+      }
+      fileText = r.readAsText(f);	
+    } else { 
+      alert("Failed to load file");
+    }
+}
+  document.getElementById('fileinput').addEventListener('change', readSingleFile, false);
+</script>
+
+
+<!-- CODE EDITOR SCRIPT -->
+
+<script type="text/javascript">
+/* ##### GLOBAL VARS ##### */
+var str, contCan, contTxt, tblData, tblFormat, columns;
+var t1,t2,t3,t4,t5,t6,t7,t8,t9;
+
+
+/* ##### SET CONTEXT ##### */
+var tblCont = document.getElementById("TableContainer");
+
+
+/* ##### FUNCTIONS ##### */
+function addRow(){
+
+	tblCode=document.getElementById("tableCode");
+	content=tblCode.value;
+	cutoff=content.indexOf("}");
+	text="\n|-- ";
+
+	parseCode();
+	while(--columns){text+=" | "}
+	newContent=impregnateString(content,text,cutoff);
+	tblCode.value=newContent;
+	updateCanvas();
+}
+function addColumn(){
+	tblCode=document.getElementById("tableCode");
+	content=tblCode.value;
+	thisRow = content.split("|--");
+	text = " | \r ";
+	var newContent = content;
+	for(i=1;i<thisRow.length;i++){
+
+		newContent = impregnateString(newContent,text,nthInstance(newContent,"|--",i));
+
+	}
+	newContent = impregnateString(newContent,text,newContent.indexOf("}"));
+
+	tblCode.value=newContent;
+	updateCanvas();
+}
+
+function findLongest(array){
+	var longest=0;
+	for(i=0;array.length>i;i++){
+		thisItem=array[i].length;
+		if(thisItem>longest){longest=thisItem}
+	}
+	return longest;
+}
+function impregnateString(mother,baby,index){
+	return mother.slice(0,index)+baby+mother.slice(index);
+}
+
+function parseCode(){
+	str = document.getElementById("tableCode").value;	
+	var start=str.indexOf("{table");
+	var end=str.indexOf("}")
+	if(start != -1){
+		var str=str.slice(start+6,end);
+		tblData=str.split("|--");
+		for(i=0;tblData.length>i;i++){
+			tblData[i]=tblData[i].split("|");
+			tblData[i].splice(0, 1);
+		}
+		contCan = str;
+	}
+	else{
+		contCan ="";
+	}
+	columns=findLongest(tblData);
+
+}
+
+function buildCode(){
+	var tblWidth="";
+
+	// |! = <th>,  | = <td>, |-- = "<tr>"
+	//GET TABLE WIDTH DATA
+	for(i=0;tblData[0].length>i;i++){
+		if(tblData[0][i].startsWith("width=")){
+			tblWidth=tblData[0][i].substring(6, tblData[0][i].length)
+			tblData[0].splice(i,1);
+			;
+		}
+	}
+	//GET TABLE FORMAT DATA
+	for(i=0;tblData[0].length > i;i++){
+		if(tblData[0][i].startsWith("format=")){
+			tblFormat=tblData[0][i].substring(7, tblData[0][i].length);
+			tblFormat=tblFormat.split(":");
+			tblData[0].splice(i,1);
+		}
+	}
+
+
+
+	// BUILD TABLE
+	contCan = "<table style='width: "+tblWidth+" ;' >";
+	for(r=0;tblData.length > r;r++){
+		contCan +="<tr>";
+
+		for(c=0;tblData[r].length > c;c++){
+			// TABLE HEADER <th>
+			if(tblData[r][c].startsWith("!")){
+				tblData[r][c] = tblData[r][c].substring(1,tblData[r][c].length);
+				contCan +="<th onClick='editCell("+r+","+c+")' id='"+r+"."+c+"' ";
+				contCan += formatCell(r,c);
+				contCan +="</th>";
+			}
+
+			else{
+				contCan +="<td onClick='editCell("+r+","+c+")' id='"+r+"."+c+"' ";
+				contCan += formatCell(r,c);
+				contCan +="</td>";
+			}
+		}
+		contCan +="</tr>";
+	}
+	contCan += "</table>";
+} 
+function formatCell(r,c){
+ //SPAN
+	var cellData = tblData[r][c].trim();
+	var cellColor='', cellTextColor='';
+	var cellWidth='', cellAlignH='', cellAlignV='', cellStyle='';
+	var cellSpan, spanEnd;
+	
+	if(cellData.startsWith("<<") || cellData.startsWith("!<<")){
+		spanEnd = cellData.indexOf(">>")+2;
+		cellSpan = cellData.substring(2,spanEnd-2);
+		cellData = cellData.substring(spanEnd);
+
+		cellSpan = cellSpan.trim();
+		cellSpan = cellSpan.split(" ");
+		for(s=0;cellSpan.length>s;s++){
+			if(cellSpan[s].includes("colspan")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				cellStyle += ' colspan="'+temp+'" ';
+				//Offset
+				//cellData[1] = strToInt(temp);
+
+			}
+			else if(cellSpan[s].includes("rowspan")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				cellStyle += ' rowspan="'+temp+'" ';
+				//cellData[2] = strToInt(temp);
+			}
+			else if(cellSpan[s].includes("bgcolor") ||
+				    cellSpan[s].includes("background-color")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				cellColor= " background-color:"+temp+"; ";
+			}
+			else if(cellSpan[s].includes("color")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				cellTextColor= " color:"+temp+"; ";
+			}
+		}
+	}
+ 	//Get Row Offset
+ 	var thisRow= tblData[r];
+
+ 	
+ 	var formatOffset=c;
+ 	for(i=c-1;i>-1;i--){
+ 		if(thisRow[i].includes("colspan")){
+ 			str=thisRow[i];
+ 			str=str.slice(str.indexOf('"')+1);
+ 			str=str.slice(0,str.indexOf('"'));
+ 			str=strToInt(str);
+ 			if(str>0){
+ 				formatOffset+=str-1;
+ 			}
+ 		}
+ 	}
+
+
+
+
+ 	// WIDTH & ALIGNMENT
+	if(formatOffset<tblFormat.length){
+		var cellWidthInd=tblFormat[formatOffset].indexOf("%");
+		if(cellWidthInd == -1){cellWidth=""}
+		else{cellWidth= " width:"+tblFormat[formatOffset].substring(0,cellWidthInd+1)+";"
+		}
+	// Alignment
+		if(tblFormat[formatOffset].includes("l")){
+			cellAlignH=" text-align:left; "}
+		else if(tblFormat[formatOffset].includes("c")){
+			cellAlignH=" text-align:center; "}
+		else if(tblFormat[formatOffset].includes("r")){				
+			cellAlignH=" text-align:right; "}
+		else{cellAlignH=""}
+
+		if(tblFormat[formatOffset].includes("m")){
+			cellAlignV=" vertical-align:middle; "}
+		else if(tblFormat[formatOffset].includes("b")){
+			cellAlignV=" vertical-align:bottom; "}
+		else{cellAlignV=""}
+	}
+	// Additional Filters
+	cellData=cellData.replace(/\[br\]/g,"<br>");
+
+	cellStyle += " style='"+cellColor+cellTextColor+cellWidth+cellAlignH+cellAlignV+"' ";
+	return cellStyle+" > "+cellData;
+}
+function updateCanvas(){
+	parseCode();
+	buildCode();
+	tblCont.innerHTML=contCan
+}
+function editCell(r,c){
+
+	var cellID = r+"."+c;
+	var thisCell = document.getElementById(cellID);
+	cellIndex=getCellIndex(thisCell);
+	var cellText = document.getElementById("tableCode").value.slice(cellIndex[0],cellIndex[1]);
+	cellText.toString();
+	thisCell.onclick = "";
+	thisCell.style.padding = 0;
+	thisCell.innerHTML = "";
+
+	var input = document.createElement("input");
+	thisCell.appendChild(input);
+	input.value = cellText;
+	input.style = "inherit";
+	input.style.width="100%";
+	input.style.padding= "4px 0 4px 0 ";
+    input.style.border="0";
+    input.style.backgroundColor="#FFA";
+    //UPDATE DATA
+	input.focus();
+    input.onblur=function(){updateCell(thisCell,cellText)}; 
+    //ACTIVATE TABLE
+    cellToolBar(r,c);  
+}
+
+function cellToolBar(r,c){
+	var inTxtC=document.getElementById("textColorInput"),
+	 	inBgC=document.getElementById("bgColorInput"),
+		inColspan=document.getElementById("colspanInput"),
+		//inRowspan=document.getElementById("rowspanInput"),
+		deleteCellBtn=document.getElementById("deleteCellButton"),
+		toolBar=document.getElementById("cellToolBar");
+
+	var tblColspan, tblRowspan, tblTxtC,tblBgC, cellStyle;
+
+	content = document.getElementById("tableCode").value;
+	var cellIndex = getCellIndexByID(r,c);
+	var cellData = content.substring(cellIndex[0],cellIndex[1]);
+	cellStyle="";
+
+	if(cellData.includes("<<")){
+		spanStart = cellData.indexOf("<<")+2;
+		spanEnd = cellData.indexOf(">>");
+		cellStyle = cellData.substring(spanStart,spanEnd);
+		cellSpan = cellStyle.trim();
+		cellSpan = cellSpan.split(" ");
+		for(s=0;cellSpan.length>s;s++){
+			if(cellSpan[s].includes("colspan")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				inColspan.value = temp;
+			} 
+			/*
+			else if(cellSpan[s].includes("rowspan")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				inRowspan.value = temp;	
+			} */
+			else if(cellSpan[s].includes("bgcolor") ||
+				    cellSpan[s].includes("background-color")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				inBgC.value=temp;
+			}
+			else if(cellSpan[s].includes("color")){
+				var cStart = cellSpan[s].indexOf('"')+1;
+				var cEnd = cellSpan[s].lastIndexOf('"');
+				temp = cellSpan[s].substring(cStart,cEnd);
+				inTxtC.value=temp;
+			} 
+		}
+	}
+	else{
+		inColspan.value=1;
+		//inRowspan.value=1;
+		inTxtC.value="#000000";
+		inBgC.value="#ffffff";
+	}
+
+
+	toolBar.style.display="block";
+	inTxtC.oninput = function(){textColorButton(r,c,cellStyle)};
+	inBgC.oninput = function (){bgColorButton(r,c,cellStyle)};
+	inColspan.max = columns;
+	inColspan.oninput=function(){colspanInput(r,c,cellStyle)};
+	deleteCellBtn.onclick=function(){deleteCell(r,c)};
+	//inRowspan.max = r;
+	//inRowspan.oninput=function(){rowspanInput(r,c,cellStyle)};
+}
+
+function textColorButton(r,c,cellStyle){
+	cellIndex = getCellIndexByID(r,c);
+	inTxtC = document.getElementById("textColorInput");
+	content = document.getElementById("tableCode").value;
+	var newContent="";
+	cellCont = content.substring(cellIndex[0],cellIndex[1]);
+	thisCell=cellStyle;
+	thisCell=thisCell.replace("bgcolor","#######");
+	thisCell=thisCell.replace("d-color","#######");
+	if(thisCell){
+		if(thisCell.includes("color")){
+			var colorVal=thisCell.slice(thisCell.indexOf("color"));
+			var colorValIndex=[nthInstance(colorVal,'"',1)+2,
+			nthInstance(colorVal,'"',2)+1];
+			newStyle=cellStyle.slice(0,colorValIndex[0])+inTxtC.value+cellStyle.slice(colorValIndex[1]);
+		}
+		else{
+			newStyle=impregnateString(cellStyle,' color="'+inTxtC.value+'" ',0);
+		}
+		newContent=content.slice(0,cellIndex[0])+cellCont.replace(cellStyle,newStyle)+content.slice(cellIndex[1]);
+	}
+	else{
+		newContent = impregnateString(content,'<< color="'+inTxtC.value+'" >>',cellIndex[0])
+	}
+	document.getElementById("tableCode").value=newContent;
+	updateCanvas();
+	document.getElementById("cellToolBar").style.display="none";
+}
+function bgColorButton(r,c,cellStyle){
+	cellIndex = getCellIndexByID(r,c);
+	inBgC = document.getElementById("bgColorInput");
+	content = document.getElementById("tableCode").value;
+	var newContent="";
+	cellCont = content.substring(cellIndex[0],cellIndex[1]);
+	thisCell=cellStyle;
+	if(thisCell){
+		if(thisCell.includes("bgcolor")){
+			var colorVal=thisCell.slice(thisCell.indexOf("bgcolor"));
+			t1=colorVal;
+			t2=thisCell;
+			var colorValIndex=[nthInstance(colorVal,'"',1)+(thisCell.length-colorVal.length)+1,
+			nthInstance(colorVal,'"',2)+(thisCell.length-colorVal.length)];
+			newStyle=cellStyle.slice(0,colorValIndex[0])+inBgC.value+cellStyle.slice(colorValIndex[1]);
+		}
+		else if(thisCell.includes("background-color")){
+			var colorVal=thisCell.slice(thisCell.indexOf("background-color"));
+			t1=colorVal;
+			t2=thisCell;
+			var colorValIndex=[nthInstance(colorVal,'"',1)+(thisCell.length-colorVal.length)+1,
+			nthInstance(colorVal,'"',2)+(thisCell.length-colorVal.length)];
+			newStyle=cellStyle.slice(0,colorValIndex[0])+inBgC.value+cellStyle.slice(colorValIndex[1]);
+		}
+		else{
+			newStyle=impregnateString(cellStyle,' bgcolor="'+inBgC.value+'" ',0);
+		}
+		newContent=content.slice(0,cellIndex[0])+cellCont.replace(cellStyle,newStyle)+content.slice(cellIndex[1]);
+	}
+	else{
+		newContent = impregnateString(content,'<< bgcolor="'+inBgC.value+'" >>',cellIndex[0])
+	}
+	document.getElementById("tableCode").value=newContent;
+	updateCanvas();
+	document.getElementById("cellToolBar").style.display="none";
+}
+function colspanInput(r,c,cellStyle){
+	cellIndex = getCellIndexByID(r,c);
+	content = document.getElementById("tableCode").value;
+	inColspan=document.getElementById("colspanInput");
+	thisCell=content.slice(cellIndex[0],cellIndex[1]);
+	var thisStyle;
+	var oldSpan=1;
+	
+	if(thisCell.includes("<<") && thisCell.includes(">>")){
+		thisStyle=thisCell.slice(thisCell.indexOf("<<")+2,thisCell.indexOf(">>"));
+		t3=thisCell;
+
+		if(thisStyle.includes("colspan")){
+			newStyle=thisStyle.slice(thisStyle.indexOf("colspan"));
+			styleIndex=[nthInstance(newStyle,'"',1)+1+(thisStyle.length-newStyle.length),nthInstance(newStyle,'"',2)+(thisStyle.length-newStyle.length)];
+			newStyle = thisStyle.slice(0,styleIndex[0])+inColspan.value+thisStyle.slice(styleIndex[1]);
+			newCell=thisCell.slice(0,thisCell.indexOf("<<")+2)+newStyle+thisCell.slice(thisCell.indexOf(">>"));
+		}
+		else{
+			newCell = impregnateString(thisCell,' colspan="'+inColspan.value+'" ',thisCell.indexOf("<<")+2);
+		}
+	}	
+	else{
+		newCell=impregnateString(thisCell,'<< colspan="'+inColspan.value+'" >>',0);
+		oldSpan=1;
+	}
+	newContent=content.slice(0,cellIndex[0])+newCell+content.slice(cellIndex[1]);
+
+	document.getElementById("tableCode").value=newContent;
+	updateCanvas(); 
+	document.getElementById("cellToolBar").style.display="none";
+}
+function deleteCell(r,c){
+	cellIndex = getCellIndexByID(r,c);
+	content = document.getElementById("tableCode").value;
+	newContent = content.slice(0,cellIndex[0]-1)+content.slice(cellIndex[1]);
+	t1=newContent;
+	document.getElementById("tableCode").value = newContent;
+	updateCanvas();
+	document.getElementById("cellToolBar").style.display="none";
+}
+/*
+function rowspanInput(r,c,cellStyle){
+	cellIndex = getCellIndexByID(r,c);
+	inRowspan=document.getElementById("rowspanInput");
+	alert("something changed");
+}
+*/
+
+function updateCell(cell,origVal){
+	var newText = cell.firstChild.value.trim();
+	var oldText = origVal.trim();
+
+	//FIND INDEX OF TEXT TO REPLACE
+	cellIndex=getCellIndex(cell);
+
+	//UPDATE CONTENT
+	var oldCont = document.getElementById("tableCode").value;
+	var cellCont = oldCont.slice(cellIndex[0],cellIndex[1]);
+
+	//VALIDATE CELL CONTENT
+	if(cellCont.includes(oldText)){
+		cellCont = cellCont.replace(oldText,newText);
+		var newCont = oldCont.slice(0,cellIndex[0])+cellCont+oldCont.slice(cellIndex[1]);
+		document.getElementById("tableCode").value=newCont;
+		updateCanvas();
+	}
+	else{
+		alert("A problem has occured! Changes have not been saved")
+	}
+}
+function getCellIndex(cell){
+	var content = document.getElementById("tableCode").value;
+	content = content.replace("|width","######");
+	content = content.replace("|format","#######");
+
+	var cellID = cell.id.split(".");
+	cellID[0]=+cellID[0]; // convert to int
+	cellID[1]=+cellID[1]; // convert to int
+
+	var rowIndex=[];
+	var colIndex=[];
+	var cellIndex=[];
+
+	if(cellID[0]==0){
+		rowIndex[0] = (nthInstance(content,"|",1))+1;
+		rowIndex[1] = nthInstance(content,"|--",1);
+		rowCont = content.slice(rowIndex[0],rowIndex[1]);
+
+		colIndex[0]= (nthInstance(rowCont,"|",cellID[1]))+1;
+		colIndex[1]= nthInstance(rowCont,"|",cellID[1]+1);	
+	} 
+	else{
+		rowIndex[0] = (nthInstance(content,"|--",cellID[0]));
+		rowIndex[1] = nthInstance(content,"|--",(cellID[0]+1));
+		rowCont = content.slice(rowIndex[0],rowIndex[1]);
+
+		colIndex[0]= (nthInstance(rowCont,"|",cellID[1]+2))+1;
+		colIndex[1]= nthInstance(rowCont,"|",cellID[1]+3);
+	}
+
+	cellIndex[0] = rowIndex[0]+colIndex[0];
+	cellIndex[1] = rowIndex[0]+colIndex[1];
+	return cellIndex;
+}
+function getCellIndexByID(r,c){
+	var content = document.getElementById("tableCode").value;
+	content = content.replace("|width","######");
+	content = content.replace("|format","#######");
+
+	var cellID = [r,c];
+	cellID[0]=+cellID[0]; // convert to int
+	cellID[1]=+cellID[1]; // convert to int
+
+	var rowIndex=[];
+	var colIndex=[];
+	var cellIndex=[];
+
+	if(cellID[0]==0){
+		rowIndex[0] = (nthInstance(content,"|",1))+1;
+		rowIndex[1] = nthInstance(content,"|--",1);
+		rowCont = content.slice(rowIndex[0],rowIndex[1]);
+
+		colIndex[0]= (nthInstance(rowCont,"|",cellID[1]))+1;
+		colIndex[1]= nthInstance(rowCont,"|",cellID[1]+1);	
+	} 
+	else{
+		rowIndex[0] = (nthInstance(content,"|--",cellID[0]));
+		rowIndex[1] = nthInstance(content,"|--",(cellID[0]+1));
+		rowCont = content.slice(rowIndex[0],rowIndex[1]);
+
+		colIndex[0]= (nthInstance(rowCont,"|",cellID[1]+2))+1;
+		colIndex[1]= nthInstance(rowCont,"|",cellID[1]+3);
+	}
+
+	cellIndex[0] = rowIndex[0]+colIndex[0];
+	cellIndex[1] = rowIndex[0]+colIndex[1];
+	return cellIndex;
+}
+function nthInstance(string, char, nth) {
+	var arr=string.split(char);
+	var totsIndex=0;
+	if(nth<string.length){
+		for(i=0;i<nth;i++){
+			if(nth<1){}
+			else if(totsIndex<string.length){
+				totsIndex += arr[i].length+char.length;
+			}
+			else{
+				alert('A '+nth+'th "'+char+'" was not found in the string');
+				totsIndex=string.length;
+				break;
+			}
+			
+		}
+		if(totsIndex<1){
+			totsIndex=0;
+		}
+		else{totsIndex-=char.length}
+	}
+	else{totsIndex=string.length}
+
+	return totsIndex;
+}
+function strToInt(str){
+	if(typeof str === 'string'){
+		ref=str.replace(/\D/g,'');
+		ref=+ref;
+		return ref;
+	}
+}
+</script>
+
+</body>
+</html>
